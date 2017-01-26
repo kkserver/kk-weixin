@@ -100,7 +100,7 @@ func (S *WXUserService) HandleWXAuthConfirmTask(a IWeixinApp, task *WXAuthConfir
 			return nil
 		}
 
-		t.Result.User = t.Result.User
+		task.Result.User = t.Result.User
 
 	} else {
 		var body = make([]byte, resp.ContentLength)

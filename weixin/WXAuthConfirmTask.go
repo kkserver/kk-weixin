@@ -12,7 +12,7 @@ type WXAuthConfirmTaskResult struct {
 type WXAuthConfirmTask struct {
 	app.Task
 	Code   string `json:"code"`
-	Result WXAuthTaskResult
+	Result WXAuthConfirmTaskResult
 }
 
 func (task *WXAuthConfirmTask) GetResult() interface{} {

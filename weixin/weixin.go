@@ -105,7 +105,7 @@ func (C *WeixinApp) GetTicketTable() *kk.DBTable {
 }
 
 func (C *WeixinApp) GetUserTable() *kk.DBTable {
-	return &C.TicketTable
+	return &C.UserTable
 }
 
 func (C *WeixinApp) GetCA() *x509.CertPool {
