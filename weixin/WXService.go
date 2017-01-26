@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"github.com/kkserver/kk-lib/kk"
@@ -20,9 +19,7 @@ import (
 
 type WXService struct {
 	app.Service
-	ca *x509.CertPool
 
-	Init   *app.InitTask
 	Ticket *WXTicketTask
 	Token  *WXTokenTask
 	Config *WXConfigTask
@@ -30,14 +27,6 @@ type WXService struct {
 
 func (S *WXService) Handle(a app.IApp, task app.ITask) error {
 	return app.ServiceReflectHandle(a, task, S)
-}
-
-func (S *WXService) HandleInitTask(a app.IApp, task *app.InitTask) error {
-
-	S.ca = x509.NewCertPool()
-	S.ca.AppendCertsFromPEM(pemCerts)
-
-	return nil
 }
 
 func (S *WXService) HandleWXTokenTask(a IWeixinApp, task *WXTokenTask) error {
@@ -83,7 +72,7 @@ func (S *WXService) HandleWXTokenTask(a IWeixinApp, task *WXTokenTask) error {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: S.ca},
+			TLSClientConfig: &tls.Config{RootCAs: a.GetCA()},
 		},
 	}
 
@@ -207,7 +196,7 @@ func (S *WXService) HandleWXTicketTask(a IWeixinApp, task *WXTicketTask) error {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: S.ca},
+			TLSClientConfig: &tls.Config{RootCAs: a.GetCA()},
 		},
 	}
 
