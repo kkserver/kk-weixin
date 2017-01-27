@@ -157,7 +157,7 @@ func getUser(a IWeixinApp, user *User, openid string, access_token string) error
 			errno := dynamic.IntValue(dynamic.Get(data, "errcode"), 0)
 
 			if errno != 0 {
-				return app.NewError(int(errno), dynamic.StringValue(dynamic.Get(data, "errcode"), ""))
+				return app.NewError(int(errno), dynamic.StringValue(dynamic.Get(data, "errmsg"), ""))
 			}
 
 			user.Subscribe = int(dynamic.IntValue(dynamic.Get(data, "subscribe"), int64(user.Subscribe)))
@@ -212,7 +212,7 @@ func getUser(a IWeixinApp, user *User, openid string, access_token string) error
 			errno := dynamic.IntValue(dynamic.Get(data, "errcode"), 0)
 
 			if errno != 0 {
-				return app.NewError(int(errno), dynamic.StringValue(dynamic.Get(data, "errcode"), ""))
+				return app.NewError(int(errno), dynamic.StringValue(dynamic.Get(data, "errmsg"), ""))
 			}
 
 			user.Sex = int(dynamic.IntValue(dynamic.Get(data, "sex"), int64(user.Sex)))
