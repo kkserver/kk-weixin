@@ -11,6 +11,7 @@ type WXUserTaskResult struct {
 
 type WXUserTask struct {
 	app.Task
+	Uid     int64  `json:"uid"`
 	Openid  string `json:"openid"`
 	Token   string `json:"token"`
 	Expires int64  `json:"expires"`

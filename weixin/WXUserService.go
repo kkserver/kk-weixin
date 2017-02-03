@@ -247,6 +247,55 @@ func (S *WXUserService) HandleWXUserTask(a IWeixinApp, task *WXUserTask) error {
 		return nil
 	}
 
+	if task.Uid != 0 {
+		sql := bytes.NewBuffer(nil)
+		args := []interface{}{}
+		sql.WriteString(" WHERE appid=? AND uid=?")
+		args = append(args, a.GetAppid(), task.Uid)
+		if task.Openid != "" {
+			sql.WriteString(" AND openid=?")
+			args = append(args, task.Openid)
+		}
+
+		rows, err := kk.DBQuery(db, a.GetUserTable(), a.GetPrefix(), sql.String(), args...)
+
+		if err != nil {
+			task.Result.Errno = ERROR_WEIXIN
+			task.Result.Errmsg = err.Error()
+			return nil
+		}
+
+		defer rows.Close()
+
+		if rows.Next() {
+
+			v := User{}
+			scanner := kk.NewDBScaner(&v)
+
+			err = scanner.Scan(rows)
+
+			if err != nil {
+				task.Result.Errno = ERROR_WEIXIN
+				task.Result.Errmsg = err.Error()
+				return nil
+			}
+
+			task.Result.User = &v
+
+			return nil
+		} else {
+			task.Result.Errno = ERROR_WEIXIN
+			task.Result.Errmsg = "Not Found user"
+			return nil
+		}
+	}
+
+	if task.Openid == "" {
+		task.Result.Errno = ERROR_WEIXIN
+		task.Result.Errmsg = "Not Found openid"
+		return nil
+	}
+
 	rows, err := kk.DBQuery(db, a.GetUserTable(), a.GetPrefix(), " WHERE appid=? AND openid=?", a.GetAppid(), task.Openid)
 
 	if err != nil {
