@@ -24,6 +24,7 @@ type WXUserService struct {
 	UnBind      *WXUserUnBindTask
 	UnBindAll   *WXUserUnBindAllTask
 	Send        *WXUserSendTask
+	Query       *WXUserQueryTask
 }
 
 func (S *WXUserService) Handle(a app.IApp, task app.ITask) error {
@@ -561,6 +562,107 @@ func (S *WXUserService) HandleWXUserSendTask(a IWeixinApp, task *WXUserSendTask)
 		}
 
 	}
+
+	return nil
+}
+
+func (S *WXUserService) HandleWXUserQueryTask(a IWeixinApp, task *WXUserQueryTask) error {
+
+	var db, err = a.GetDB()
+
+	if err != nil {
+		task.Result.Errno = ERROR_WEIXIN
+		task.Result.Errmsg = err.Error()
+		return nil
+	}
+
+	sql := bytes.NewBuffer(nil)
+	args := []interface{}{}
+
+	sql.WriteString(" WHERE appid=?")
+	args = append(args, a.GetAppid())
+
+	if task.Uid != 0 {
+		sql.WriteString(" AND uid=?")
+		args = append(args, task.Uid)
+	}
+
+	if task.Openid != "" {
+		sql.WriteString(" AND openid=?")
+		args = append(args, task.Openid)
+	}
+
+	if task.Keyword != "" {
+		q := "%" + task.Keyword + "%"
+		sql.WriteString(" AND (nick LIKE ? OR province LIKE ? OR city LIKE ?)")
+		args = append(args, q, q, q)
+	}
+
+	if task.OrderBy == "asc" {
+		sql.WriteString(" ORDER BY id ASC")
+	} else {
+		sql.WriteString(" ORDER BY id DESC")
+	}
+
+	var pageIndex = task.PageIndex
+	var pageSize = task.PageSize
+
+	if pageIndex < 1 {
+		pageIndex = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	if task.Counter {
+		var counter = WXUserQueryCounter{}
+		counter.PageIndex = pageIndex
+		counter.PageSize = pageSize
+		total, err := kk.DBQueryCount(db, a.GetUserTable(), a.GetPrefix(), sql.String(), args...)
+		if err != nil {
+			task.Result.Errno = ERROR_WEIXIN
+			task.Result.Errmsg = err.Error()
+			return nil
+		}
+		if total%pageSize == 0 {
+			counter.PageCount = total / pageSize
+		} else {
+			counter.PageCount = total/pageSize + 1
+		}
+		task.Result.Counter = &counter
+	}
+
+	sql.WriteString(fmt.Sprintf(" LIMIT %d,%d", (pageIndex-1)*pageSize, pageSize))
+
+	var users = []User{}
+	var v = User{}
+	var scanner = kk.NewDBScaner(&v)
+
+	rows, err := kk.DBQuery(db, a.GetUserTable(), a.GetPrefix(), sql.String(), args...)
+
+	if err != nil {
+		task.Result.Errno = ERROR_WEIXIN
+		task.Result.Errmsg = err.Error()
+		return nil
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+
+		err = scanner.Scan(rows)
+
+		if err != nil {
+			task.Result.Errno = ERROR_WEIXIN
+			task.Result.Errmsg = err.Error()
+			return nil
+		}
+
+		users = append(users, v)
+	}
+
+	task.Result.Users = users
 
 	return nil
 }
