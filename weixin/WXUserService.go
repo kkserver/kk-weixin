@@ -258,6 +258,8 @@ func (S *WXUserService) HandleWXUserTask(a IWeixinApp, task *WXUserTask) error {
 			args = append(args, task.Openid)
 		}
 
+		sql.WriteString(" ORDER BY id ASC LIMIT 1")
+
 		rows, err := kk.DBQuery(db, a.GetUserTable(), a.GetPrefix(), sql.String(), args...)
 
 		if err != nil {
@@ -297,7 +299,7 @@ func (S *WXUserService) HandleWXUserTask(a IWeixinApp, task *WXUserTask) error {
 		return nil
 	}
 
-	rows, err := kk.DBQuery(db, a.GetUserTable(), a.GetPrefix(), " WHERE appid=? AND openid=?", a.GetAppid(), task.Openid)
+	rows, err := kk.DBQuery(db, a.GetUserTable(), a.GetPrefix(), " WHERE appid=? AND openid=? ORDER BY id ASC LIMIT 1", a.GetAppid(), task.Openid)
 
 	if err != nil {
 		task.Result.Errno = ERROR_WEIXIN
@@ -355,22 +357,69 @@ func (S *WXUserService) HandleWXUserTask(a IWeixinApp, task *WXUserTask) error {
 			}
 		}
 
-		v.Appid = a.GetAppid()
-		v.Openid = task.Openid
-		v.Token = task.Token
-		v.Expires = task.Expires
-		v.Mtime = time.Now().Unix()
-		v.Ctime = v.Mtime
+		tx, err := db.Begin()
 
-		_, err = kk.DBInsert(db, a.GetUserTable(), a.GetPrefix(), &v)
+		err = func() error {
 
-		if err != nil {
-			task.Result.Errno = ERROR_WEIXIN
-			task.Result.Errmsg = err.Error()
+			rows, err := kk.DBQuery(tx, a.GetUserTable(), a.GetPrefix(), " WHERE appid=? AND openid=? ORDER BY id ASC LIMIT 1", a.GetAppid(), task.Openid)
+
+			if err != nil {
+				return err
+			}
+
+			defer rows.Close()
+
+			if rows.Next() {
+
+				scanner := kk.NewDBScaner(&v)
+
+				err = scanner.Scan(rows)
+
+				if err != nil {
+					return err
+				}
+
+				task.Result.User = &v
+
+			} else {
+
+				v.Appid = a.GetAppid()
+				v.Openid = task.Openid
+				v.Token = task.Token
+				v.Expires = task.Expires
+				v.Mtime = time.Now().Unix()
+				v.Ctime = v.Mtime
+
+				_, err = kk.DBInsert(db, a.GetUserTable(), a.GetPrefix(), &v)
+
+				if err != nil {
+					return err
+				}
+
+				task.Result.User = &v
+			}
+
 			return nil
+
+		}()
+
+		if err == nil {
+			err = tx.Commit()
 		}
 
-		task.Result.User = &v
+		if err != nil {
+			tx.Rollback()
+			e, ok := err.(*app.Error)
+			if ok {
+				task.Result.Errno = e.Errno
+				task.Result.Errmsg = e.Errmsg
+				return nil
+			} else {
+				task.Result.Errno = ERROR_WEIXIN
+				task.Result.Errmsg = err.Error()
+				return nil
+			}
+		}
 
 	}
 
